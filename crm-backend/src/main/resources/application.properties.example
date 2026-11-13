@@ -1,0 +1,50 @@
+spring.application.name=crm-backend
+server.port=${SERVER_PORT:8080}
+
+# ==========================================================
+# PostgreSQL Configuration
+# Copy this file to application.properties and replace the
+# placeholder password. The real local file is git-ignored.
+# ==========================================================
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/crm_db}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:postgres}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:CHANGE_ME}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# Hibernate / JPA
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+spring.jpa.open-in-view=false
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+
+# ==========================================================
+# JWT Configuration
+# Replace this development placeholder with a long random
+# secret (at least 32 bytes) before running the application.
+# ==========================================================
+app.jwt.secret=${APP_JWT_SECRET:CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_BYTES}
+app.jwt.expiration-ms=${APP_JWT_EXPIRATION_MS:86400000}
+
+# ==========================================================
+# SLA scanner (runs every 60 seconds by default)
+# ==========================================================
+app.sla.scan-rate-ms=${APP_SLA_SCAN_RATE_MS:60000}
+
+# ==========================================================
+# CORS (frontend origins, comma separated)
+# ==========================================================
+app.cors.allowed-origins=${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+# ==========================================================
+# Swagger / OpenAPI
+# ==========================================================
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/v3/api-docs
+
+# ==========================================================
+# Logging
+# ==========================================================
+logging.level.com.plmforge.crm=INFO
+logging.level.org.springframework.security=INFO
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n

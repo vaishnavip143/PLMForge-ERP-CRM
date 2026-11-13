@@ -1,0 +1,32 @@
+# Dependencies and build output
+node_modules/
+dist/
+target/
+build/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.settings/
+.classpath
+.project
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+crm-backend/src/main/resources/application.properties
+
+# Freebuff workspace metadata
+.freebuff/
+
+# Logs and temporary files
+*.log
+logs/
+*.tmp
+.DS_Store
+Thumbs.db
