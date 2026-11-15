@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api, { errorMessage } from './api'
+import api, { friendlyError } from './api'
 import { Message, TicketTable } from './components'
 import { humanize } from './helpers'
 
@@ -22,7 +22,7 @@ export default function SalesDashboard() {
       const response = await api.get('/api/sales/tickets')
       setTickets(response.data.data || [])
     } catch (error) {
-      setLoadError(errorMessage(error))
+      setLoadError(friendlyError(error))
     } finally {
       setLoading(false)
     }
@@ -57,7 +57,7 @@ export default function SalesDashboard() {
         text: `Ticket ${updated.ticketNumber} is now ${humanize(updated.status)}.`,
       })
     } catch (error) {
-      setMessage({ type: 'error', text: errorMessage(error) })
+      setMessage({ type: 'error', text: friendlyError(error) })
     } finally {
       setSaving(false)
     }

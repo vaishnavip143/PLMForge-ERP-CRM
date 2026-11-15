@@ -185,8 +185,9 @@ below. On an existing database it does nothing, so your data is preserved.
 
 ### Development test accounts
 
-All seed users share a development password defined in `DataInitializer` (stored as a BCrypt
-hash, never plain text). It is intentionally not reproduced in this document.
+All seed users share the development password `password123` (`DEV_PASSWORD` in `DataInitializer`;
+it is stored as a BCrypt hash in the database). Local development only - change it before any
+shared deployment.
 
 | Role | Email |
 |---|---|

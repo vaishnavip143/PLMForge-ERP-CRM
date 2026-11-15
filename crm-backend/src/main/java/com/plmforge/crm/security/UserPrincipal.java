@@ -9,9 +9,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Spring Security view of an authenticated CRM user.
- */
 public class UserPrincipal implements UserDetails {
 
     private final Long id;

@@ -31,7 +31,6 @@ public class TicketIngestRequest {
     @Size(max = 5000, message = "Description must not exceed 5000 characters")
     private String description;
 
-    /** Optional contact number. */
     @Pattern(regexp = "^[0-9+()\\- ]{7,20}$", message = "Phone must contain 7 to 20 digits or phone symbols")
     private String phone;
 }

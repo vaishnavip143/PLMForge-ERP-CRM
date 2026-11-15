@@ -400,8 +400,9 @@ On a fresh database it creates:
   `RESOLVED`) and one `OPEN` ticket linked to the lead and left unassigned.
 - 2 manager notifications: one `NEW_LEAD` and one `SLA_WARNING`.
 
-The shared development password for the seeded users is defined in `DataInitializer` and is
-intentionally not reproduced in this README. It is a local development credential only.
+All seeded users share the development password **`password123`** (the `DEV_PASSWORD` constant in
+`DataInitializer`; it is stored as a BCrypt hash). That is a local development credential only -
+change it before any shared or production deployment.
 
 > Because the initializer checks `users`, a database that already contains users will not receive
 > seed data again. See [Troubleshooting](#18-troubleshooting) if the demo accounts are missing.
@@ -1336,7 +1337,8 @@ These are not implemented and would be reasonable next steps:
 - `node_modules/`, `dist/`, `target/`, `.idea/`, `.vscode/`, `.freebuff/`, logs, `.env` files and
   local backend configuration are ignored by `.gitignore`.
 - `crm-frontend/.env.example` documents the optional `VITE_API_URL` setting.
-- No real password, JWT secret or database credential appears in this README.
+- No production password, JWT secret or database credential appears in this README. The only
+  credential written down is the shared local seed password above.
 - Development seed credentials are defined in `DataInitializer` for local use only. Change them
   before any shared or production deployment.
 - The JWT secret in the local properties file must be a long random value; rotate it if it has

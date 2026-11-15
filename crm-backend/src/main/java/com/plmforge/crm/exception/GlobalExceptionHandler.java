@@ -30,42 +30,42 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex,
                                                               HttpServletRequest request) {
-        log.warn("Resource not found: {}", ex.getMessage());
+        log.warn("lookup missed: {}", ex.getMessage());
         return error(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateResourceException ex,
                                                                HttpServletRequest request) {
-        log.warn("Duplicate resource: {}", ex.getMessage());
+        log.warn("duplicate: {}", ex.getMessage());
         return error(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(BadRequestException ex,
                                                                 HttpServletRequest request) {
-        log.warn("Bad request: {}", ex.getMessage());
+        log.warn("bad request: {}", ex.getMessage());
         return error(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex,
                                                                     HttpServletRequest request) {
-        log.warn("Failed authentication attempt on {}", request.getRequestURI());
+        log.warn("failed login on {}", request.getRequestURI());
         return error(HttpStatus.UNAUTHORIZED, "Invalid email or password", request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex,
                                                                     HttpServletRequest request) {
-        log.warn("Authentication error on {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("auth problem on {}: {}", request.getRequestURI(), ex.getMessage());
         return error(HttpStatus.UNAUTHORIZED, "Authentication failed", request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex,
                                                                   HttpServletRequest request) {
-        log.warn("Access denied on {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("blocked: {} ({})", request.getRequestURI(), ex.getMessage());
         return error(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
@@ -81,21 +81,21 @@ public class GlobalExceptionHandler {
                 "Request validation failed", request);
         body.put("validationErrors", fieldErrors);
 
-        log.warn("Validation failed on {}: {}", request.getRequestURI(), fieldErrors);
+        log.warn("validation failed on {}: {}", request.getRequestURI(), fieldErrors);
         return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex,
                                                                          HttpServletRequest request) {
-        log.warn("Constraint violation on {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("constraint violation on {}: {}", request.getRequestURI(), ex.getMessage());
         return error(HttpStatus.BAD_REQUEST, "Request validation failed: " + ex.getMessage(), request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleUnreadableBody(HttpMessageNotReadableException ex,
                                                                     HttpServletRequest request) {
-        log.warn("Malformed request body on {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("couldn't read the request body on {}: {}", request.getRequestURI(), ex.getMessage());
         return error(HttpStatus.BAD_REQUEST,
                 "Malformed request body or invalid enum value. Check the JSON format and allowed values.",
                 request);
@@ -118,16 +118,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex,
                                                                    HttpServletRequest request) {
-        log.error("Database constraint violation on {}", request.getRequestURI(), ex);
+        log.error("db constraint blew up on {}", request.getRequestURI(), ex);
         return error(HttpStatus.CONFLICT,
                 "The request conflicts with existing data (for example a duplicate email).", request);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex, HttpServletRequest request) {
-        log.error("Unexpected error on {}", request.getRequestURI(), ex);
+        log.error("unhandled error on {}", request.getRequestURI(), ex);
         return error(HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred. Please contact support if the problem persists.", request);
+                "Something broke on our side. Try again in a moment.", request);
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status,

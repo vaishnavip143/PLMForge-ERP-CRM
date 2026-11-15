@@ -67,25 +67,21 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
 
-                        // Manager-only capabilities
                         .requestMatchers("/api/manager/**").hasRole("SALES_MANAGER")
 
-                        // Sales representative capabilities (manager included)
+                        // Managers get into the sales endpoints as well, that is why both roles are listed.
                         .requestMatchers("/api/sales/**").hasAnyRole("SALES_REPRESENTATIVE", "SALES_MANAGER")
 
-                        // Customer self-service
                         .requestMatchers("/api/customers/**").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/tickets/my").hasRole("CUSTOMER")
 
-                        // Any signed-in business role can ingest a query
                         .requestMatchers(HttpMethod.POST, "/api/tickets/ingest")
                         .hasAnyRole("CUSTOMER", "SALES_REPRESENTATIVE", "SALES_MANAGER")
 
-                        // Ticket details / notifications require authentication; ownership is checked in services
+                        // Route rules only cover the role. Per-object ownership is checked in the services.
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

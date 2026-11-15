@@ -13,9 +13,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Returns a consistent JSON 403 response when the role is not allowed.
- */
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 

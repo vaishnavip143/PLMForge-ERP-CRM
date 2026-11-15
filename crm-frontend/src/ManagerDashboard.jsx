@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api, { errorMessage } from './api'
+import api, { friendlyError } from './api'
 import { Message, TicketTable } from './components'
 import { formatDateTime, humanize } from './helpers'
 
@@ -29,7 +29,7 @@ export default function ManagerDashboard() {
       setTickets(response.data.data || [])
       setTicketsError('')
     } catch (error) {
-      setTicketsError(errorMessage(error))
+      setTicketsError(friendlyError(error))
     } finally {
       setTicketsLoading(false)
     }
@@ -41,7 +41,7 @@ export default function ManagerDashboard() {
       setLeads(response.data.data || [])
       setLeadsError('')
     } catch (error) {
-      setLeadsError(errorMessage(error))
+      setLeadsError(friendlyError(error))
     } finally {
       setLeadsLoading(false)
     }
@@ -53,7 +53,7 @@ export default function ManagerDashboard() {
       setNotifications(response.data.data || [])
       setNotificationsError('')
     } catch (error) {
-      setNotificationsError(errorMessage(error))
+      setNotificationsError(friendlyError(error))
     } finally {
       setNotificationsLoading(false)
     }
@@ -65,12 +65,13 @@ export default function ManagerDashboard() {
       setSla(response.data.data)
       setSlaError('')
     } catch (error) {
-      setSlaError(errorMessage(error))
+      setSlaError(friendlyError(error))
     } finally {
       setSlaLoading(false)
     }
   }
 
+  // Four separate calls so one slow panel does not hold up the rest.
   useEffect(() => {
     loadTickets()
     loadLeads()
@@ -89,7 +90,7 @@ export default function ManagerDashboard() {
       )
       setMessage({ type: 'success', text: 'Notification marked as read.' })
     } catch (error) {
-      setMessage({ type: 'error', text: errorMessage(error) })
+      setMessage({ type: 'error', text: friendlyError(error) })
     } finally {
       setMarkingId(null)
     }

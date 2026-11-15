@@ -31,16 +31,14 @@ public class NotificationService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * Creates one notification per Sales Manager. Duplicate notifications for
-     * the same ticket + type + recipient are skipped.
-     */
+    // One row per sales manager. Same ticket + type + recipient is skipped, otherwise
+    // the every-60-seconds SLA rescan would bury them in duplicates.
     @Transactional
     public List<Notification> notifyManagers(NotificationType type, String message, Ticket ticket) {
         List<User> managers = userRepository.findByRole(Role.ROLE_SALES_MANAGER);
 
         if (managers.isEmpty()) {
-            log.warn("No SALES_MANAGER user exists; notification [{}] for ticket [{}] was not stored",
+            log.warn("no sales managers in the db, dropping the {} notification for ticket {}",
                     type, ticket != null ? ticket.getId() : null);
             return List.of();
         }
@@ -50,8 +48,8 @@ public class NotificationService {
             if (ticket != null && ticket.getId() != null
                     && notificationRepository.existsByRecipient_IdAndTypeAndRelatedTicket_Id(
                             manager.getId(), type, ticket.getId())) {
-                log.debug("Skipping duplicate [{}] notification for manager {} and ticket {}",
-                        type, manager.getId(), ticket.getId());
+                log.debug("{} already notified for ticket {}, skipping",
+                        manager.getId(), ticket.getId());
                 continue;
             }
             created.add(save(manager, type, message, ticket));
@@ -89,7 +87,7 @@ public class NotificationService {
         if (!notification.isRead()) {
             notification.setRead(true);
             notificationRepository.save(notification);
-            log.info("Notification {} marked as read by recipient {}", notificationId, recipientId);
+            log.info("notification {} read by {}", notificationId, recipientId);
         }
         return toResponse(notification);
     }
@@ -103,7 +101,7 @@ public class NotificationService {
                 .read(false)
                 .build());
 
-        log.info("Notification created: id={}, type={}, recipient={}, ticket={}",
+        log.info("notification {} ({}) -> {} for {}",
                 notification.getId(), type, recipient.getEmail(),
                 ticket != null ? ticket.getTicketNumber() : null);
         return notification;

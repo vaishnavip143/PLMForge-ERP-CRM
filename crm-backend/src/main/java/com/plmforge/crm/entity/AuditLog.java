@@ -5,9 +5,6 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-/**
- * Simple audit trail for important business operations.
- */
 @Entity
 @Table(name = "audit_logs")
 @Getter

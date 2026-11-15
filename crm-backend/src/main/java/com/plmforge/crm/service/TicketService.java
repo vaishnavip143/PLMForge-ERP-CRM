@@ -45,10 +45,10 @@ public class TicketService {
 
     private static final Logger log = LoggerFactory.getLogger(TicketService.class);
 
-    /** Default Turn Around Time for every incoming query. */
+    // 24h TAT for every query - this is what the business agreed on, not a tuning knob.
     public static final int DEFAULT_TAT_HOURS = 24;
 
-    /** An active ticket with less than this many minutes remaining is an SLA alert. */
+    // Less than two hours left on an active ticket counts as an SLA warning.
     public static final long SLA_WARNING_THRESHOLD_MINUTES = 120;
 
     private static final DateTimeFormatter TICKET_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -75,35 +75,31 @@ public class TicketService {
         this.auditService = auditService;
     }
 
-    // ==================================================================
-    // Dynamic query ingestion
-    // ==================================================================
-
     @Transactional
     public TicketIngestResponse ingest(TicketIngestRequest request, String performedBy) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         String name = request.getName().trim();
-        String phone = normalizeOptional(request.getPhone());
-        LocalDateTime now = LocalDateTime.now();
+        String phone = trimToNull(request.getPhone());
+        var now = LocalDateTime.now();
 
-        log.info("Incoming query received: email={}, customerId={}, subject='{}'",
+        log.info("query came in from {} (customerId={}, subject=\"{}\")",
                 email, request.getCustomerId(), request.getSubject());
 
-        Customer existingCustomer = resolveExistingCustomer(request.getCustomerId(), email);
+        Customer knownCustomer = resolveExistingCustomer(request.getCustomerId(), email);
 
-        if (existingCustomer != null) {
-            log.info("EXISTING CUSTOMER identified: customerId={}, email={}", existingCustomer.getId(), email);
+        if (knownCustomer != null) {
+            log.info("{} is an existing customer (#{})", email, knownCustomer.getId());
 
-            Ticket ticket = buildTicket(request, email, name, existingCustomer, null, now);
+            Ticket ticket = buildTicket(request, email, name, knownCustomer, null, now);
             ticket = ticketRepository.save(ticket);
 
             auditService.record(ticket.getId(), ticket.getTicketNumber(), "QUERY_INGESTED_EXISTING_CUSTOMER",
                     performedBy,
-                    "Query linked to existing customer #" + existingCustomer.getId()
+                    "Query linked to existing customer #" + knownCustomer.getId()
                             + ". 24h TAT assigned. Due at " + ticket.getDueAt());
 
-            log.info("Ticket created for existing customer: ticketId={}, ticketNumber={}, dueAt={}",
-                    ticket.getId(), ticket.getTicketNumber(), ticket.getDueAt());
+            log.info("ticket {} saved for customer #{}, due {}",
+                    ticket.getTicketNumber(), knownCustomer.getId(), ticket.getDueAt());
 
             return TicketIngestResponse.builder()
                     .ticket(mapToResponse(ticket))
@@ -114,9 +110,9 @@ public class TicketService {
                     .build();
         }
 
-        // CASE 2: unknown email -> potential customer (lead)
+        // Unknown sender, so it becomes a lead. Same email again -> reuse the old lead row.
         PotentialCustomer lead = potentialCustomerRepository.findByEmailIgnoreCase(email).orElse(null);
-        boolean leadCreated = false;
+        boolean isNewLead = false;
 
         if (lead == null) {
             lead = potentialCustomerRepository.save(PotentialCustomer.builder()
@@ -126,10 +122,10 @@ public class TicketService {
                     .source("INCOMING_QUERY")
                     .status(LeadStatus.NEW_LEAD)
                     .build());
-            leadCreated = true;
-            log.info("POTENTIAL CUSTOMER created: potentialCustomerId={}, email={}", lead.getId(), email);
+            isNewLead = true;
+            log.info("new lead captured: #{} {}", lead.getId(), email);
         } else {
-            log.info("Existing potential customer reused: potentialCustomerId={}, email={}", lead.getId(), email);
+            log.info("reusing lead #{} for {}", lead.getId(), email);
             if (lead.getPhone() == null && phone != null) {
                 lead.setPhone(phone);
                 potentialCustomerRepository.save(lead);
@@ -148,19 +144,19 @@ public class TicketService {
 
         auditService.record(ticket.getId(), ticket.getTicketNumber(), "QUERY_INGESTED_POTENTIAL_CUSTOMER",
                 performedBy,
-                (leadCreated ? "New potential customer #" + lead.getId() + " created. "
+                (isNewLead ? "New potential customer #" + lead.getId() + " created. "
                         : "Existing potential customer #" + lead.getId() + " reused. ")
                         + notifications.size() + " manager notification(s) created. 24h TAT assigned.");
 
-        log.info("Ticket created for potential customer: ticketId={}, ticketNumber={}, notifications={}",
-                ticket.getId(), ticket.getTicketNumber(), notifications.size());
+        log.info("lead ticket {} created, {} manager(s) notified",
+                ticket.getTicketNumber(), notifications.size());
 
         return TicketIngestResponse.builder()
                 .ticket(mapToResponse(ticket))
                 .potentialCustomer(PotentialCustomerResponse.from(lead))
                 .notificationCreated(!notifications.isEmpty())
                 .notificationMessage(notifications.isEmpty() ? null : notificationMessage)
-                .message(leadCreated
+                .message(isNewLead
                         ? "Unknown sender: potential customer created, ticket registered and Sales Manager notified."
                         : "Existing potential customer reused, new ticket registered and Sales Manager notified.")
                 .build();
@@ -172,7 +168,7 @@ public class TicketService {
             if (byId != null) {
                 return byId;
             }
-            log.warn("Provided customerId={} does not exist; falling back to email lookup", customerId);
+            log.warn("customerId={} does not exist, falling back to the email lookup", customerId);
         }
         return customerRepository.findByEmailIgnoreCase(email).orElse(null);
     }
@@ -213,23 +209,19 @@ public class TicketService {
         return "TICK-" + date + "-" + System.nanoTime();
     }
 
-    // ==================================================================
-    // Read operations
-    // ==================================================================
-
     @Transactional(readOnly = true)
     public List<TicketResponse> getMyTickets(String email) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
-        Map<Long, Ticket> ticketsById = new LinkedHashMap<>();
+        var byId = new LinkedHashMap<Long, Ticket>();
 
         customerRepository.findByEmailIgnoreCase(normalizedEmail).ifPresent(customer ->
                 ticketRepository.findByCustomer_IdOrderByCreatedAtDesc(customer.getId())
-                        .forEach(ticket -> ticketsById.put(ticket.getId(), ticket)));
+                        .forEach(ticket -> byId.put(ticket.getId(), ticket)));
 
         ticketRepository.findByPotentialCustomer_EmailIgnoreCaseOrderByCreatedAtDesc(normalizedEmail)
-                .forEach(ticket -> ticketsById.put(ticket.getId(), ticket));
+                .forEach(ticket -> byId.put(ticket.getId(), ticket));
 
-        return ticketsById.values().stream()
+        return byId.values().stream()
                 .sorted(Comparator.comparing(Ticket::getCreatedAt,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::mapToResponse)
@@ -245,7 +237,7 @@ public class TicketService {
                 if (!isOwnedByCustomer(ticket, principal.getUsername())) {
                     log.warn("Customer {} attempted to access ticket {} owned by another customer",
                             principal.getUsername(), id);
-                    throw new AccessDeniedException("You can only access your own tickets");
+                    throw new AccessDeniedException("That ticket belongs to another customer.");
                 }
             }
             case ROLE_SALES_REPRESENTATIVE -> {
@@ -253,11 +245,11 @@ public class TicketService {
                         || !ticket.getAssignedTo().getId().equals(principal.getId())) {
                     log.warn("Representative {} attempted to access ticket {} assigned to someone else",
                             principal.getUsername(), id);
-                    throw new AccessDeniedException("You can only access tickets assigned to you");
+                    throw new AccessDeniedException("That ticket isn't assigned to you.");
                 }
             }
             case ROLE_SALES_MANAGER -> {
-                // Managers may view every ticket.
+                // managers see everything, no check needed
             }
         }
 
@@ -280,6 +272,8 @@ public class TicketService {
                 .toList();
     }
 
+    // Nothing calls this any more; the manager alert tables come from SlaService.
+    // Left in place until someone confirms no report depends on it.
     @Transactional(readOnly = true)
     public List<TicketResponse> getActiveTickets() {
         return ticketRepository.findByStatusInOrderByDueAtAsc(
@@ -289,21 +283,17 @@ public class TicketService {
                 .toList();
     }
 
-    // ==================================================================
-    // Status updates and assignment
-    // ==================================================================
-
     @Transactional
     public TicketResponse updateStatus(Long id, UpdateTicketStatusRequest request, UserPrincipal principal) {
         Ticket ticket = findTicket(id);
 
         if (principal.getRole() == Role.ROLE_CUSTOMER) {
-            throw new AccessDeniedException("Customers cannot change ticket status");
+            throw new AccessDeniedException("Customers can't change ticket status.");
         }
         if (principal.getRole() == Role.ROLE_SALES_REPRESENTATIVE
                 && (ticket.getAssignedTo() == null
                 || !ticket.getAssignedTo().getId().equals(principal.getId()))) {
-            throw new AccessDeniedException("You can only update tickets assigned to you");
+            throw new AccessDeniedException("That ticket isn't assigned to you.");
         }
 
         TicketStatus oldStatus = ticket.getStatus();
@@ -324,8 +314,8 @@ public class TicketService {
 
         ticket = ticketRepository.save(ticket);
 
-        log.info("Ticket status changed: ticketNumber={}, from={}, to={}, by={}",
-                ticket.getTicketNumber(), oldStatus, newStatus, principal.getUsername());
+        log.info("{} moved {} from {} to {}",
+                principal.getUsername(), ticket.getTicketNumber(), oldStatus, newStatus);
 
         auditService.record(ticket.getId(), ticket.getTicketNumber(), "TICKET_STATUS_CHANGED",
                 principal.getUsername(),
@@ -341,10 +331,10 @@ public class TicketService {
 
         User representative = userRepository.findById(representativeId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Sales representative not found with id: " + representativeId));
+                        "No sales representative with id " + representativeId));
 
         if (representative.getRole() != Role.ROLE_SALES_REPRESENTATIVE) {
-            throw new BadRequestException("Selected user is not a sales representative");
+            throw new BadRequestException("That user isn't a sales representative.");
         }
 
         ticket.setAssignedTo(representative);
@@ -353,7 +343,7 @@ public class TicketService {
         }
         ticket = ticketRepository.save(ticket);
 
-        log.info("Ticket assigned: ticketNumber={}, representative={}, by={}",
+        log.info("ticket {} handed to {} (by {})",
                 ticket.getTicketNumber(), representative.getEmail(), performedBy);
 
         auditService.record(ticket.getId(), ticket.getTicketNumber(), "TICKET_ASSIGNED", performedBy,
@@ -365,10 +355,6 @@ public class TicketService {
 
         return mapToResponse(ticket);
     }
-
-    // ==================================================================
-    // Mapping helpers
-    // ==================================================================
 
     public TicketResponse mapToResponse(Ticket ticket) {
         LocalDateTime now = LocalDateTime.now();
@@ -429,7 +415,7 @@ public class TicketService {
 
     private Ticket findTicket(Long id) {
         return ticketRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("No ticket with id " + id));
     }
 
     private boolean isOwnedByCustomer(Ticket ticket, String email) {
@@ -441,7 +427,7 @@ public class TicketService {
                 && ticket.getPotentialCustomer().getEmail().equalsIgnoreCase(email);
     }
 
-    private String normalizeOptional(String value) {
+    private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 

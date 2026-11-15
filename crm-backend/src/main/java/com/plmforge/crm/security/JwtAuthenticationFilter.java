@@ -14,10 +14,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Reads "Authorization: Bearer <token>", validates the JWT and puts the
- * authenticated user into the SecurityContext.
- */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { errorMessage } from './api'
+import { friendlyError } from './api'
 import { Message } from './components'
 
 export default function LoginScreen({ roleOptions, preferredRole, onLogin, onRegister }) {
@@ -7,8 +7,8 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
     roleOptions.find((option) => option.role === preferredRole) || roleOptions[0]
 
   const [selectedRole, setSelectedRole] = useState(startingRole.role)
-  const [mode, setMode] = useState('login') // 'login' or 'register'
-  const [pending, setPending] = useState('')
+  const [mode, setMode] = useState('login')
+  const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
@@ -17,8 +17,8 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
   const selectedOption =
     roleOptions.find((option) => option.role === selectedRole) || roleOptions[0]
 
-  // Selecting a role only highlights the suggested account. It never signs anybody
-  // in and never fills credentials, so the typed email always decides the login.
+  // Picking a portal only changes the hint text. It does not sign anyone in and does
+  // not fill the email field, so the typed email always decides the login.
   function selectRole(option) {
     setSelectedRole(option.role)
     setLoginForm({ email: '', password: '' })
@@ -39,14 +39,14 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
       return
     }
 
-    setPending('login')
+    setBusy('login')
     setError('')
     try {
       await onLogin(loginForm.email.trim(), loginForm.password, selectedRole)
     } catch (err) {
-      setError(err.roleMismatch ? err.message : errorMessage(err))
+      setError(err.roleMismatch ? err.message : friendlyError(err))
     } finally {
-      setPending('')
+      setBusy('')
     }
   }
 
@@ -62,7 +62,7 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
       return
     }
 
-    setPending('register')
+    setBusy('register')
     setError('')
     setNotice('')
     try {
@@ -72,8 +72,8 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
         password: registerForm.password,
       })
 
-      // Registration and login are separate actions: switch to the login form.
-      // Registration always creates a Customer, so select the Customer portal.
+      // Registration never logs you in. Flip to the login tab, prefill the email and
+      // select the Customer portal because that is the only role registration creates.
       setSelectedRole('CUSTOMER')
       setMode('login')
       setLoginForm({ email: registered.email || registerForm.email.trim(), password: '' })
@@ -82,9 +82,9 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
         `Customer ${registered.email} was registered. Now sign in with that email and password.`,
       )
     } catch (err) {
-      setError(errorMessage(err))
+      setError(friendlyError(err))
     } finally {
-      setPending('')
+      setBusy('')
     }
   }
 
@@ -185,8 +185,8 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
                   />
                 </div>
                 <div className="form-actions">
-                  <button className="btn btn-primary" type="submit" disabled={Boolean(pending)}>
-                    {pending === 'login' ? 'Signing in…' : 'Sign in'}
+                  <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>
+                    {busy === 'login' ? 'Signing in…' : 'Sign in'}
                   </button>
                   <span className="hint-text">
                     The dashboard comes from the JWT, not from the role buttons.
@@ -237,8 +237,8 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
                   />
                 </div>
                 <div className="form-actions">
-                  <button className="btn btn-primary" type="submit" disabled={Boolean(pending)}>
-                    {pending === 'register' ? 'Creating account…' : 'Create customer account'}
+                  <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>
+                    {busy === 'register' ? 'Creating account…' : 'Create customer account'}
                   </button>
                   <span className="hint-text">
                     Registration only creates the account. You sign in separately afterwards.

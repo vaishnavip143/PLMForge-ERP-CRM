@@ -51,16 +51,14 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    /**
-     * Public registration. The role is always CUSTOMER - any role sent by the
-     * client is ignored because RegisterRequest has no role field at all.
-     */
+    // Public signup. Always creates a CUSTOMER - RegisterRequest has no role field,
+    // so there is nothing a client could send to change that.
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.getEmail());
 
         if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new DuplicateResourceException("An account with email '" + email + "' already exists");
+            throw new DuplicateResourceException("There is already an account for " + email);
         }
 
         User user = User.builder()
@@ -72,8 +70,8 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Every registered customer also gets a customer profile so that
-        // self-service endpoints and query ingestion work immediately.
+        // Registration also creates the customer profile, otherwise the
+        // self-service endpoints have nothing to read on first sign-in.
         if (!customerRepository.existsByEmailIgnoreCase(email)) {
             customerRepository.save(Customer.builder()
                     .name(savedUser.getName())
@@ -81,7 +79,7 @@ public class AuthService {
                     .build());
         }
 
-        log.info("New customer registered: userId={}, email={}", savedUser.getId(), savedUser.getEmail());
+        log.info("new customer signed up: {} (#{})", savedUser.getEmail(), savedUser.getId());
 
         return RegisterResponse.builder()
                 .userId(savedUser.getId())
@@ -101,15 +99,15 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException exception) {
-            log.warn("Failed login attempt for email: {}", email);
+            log.warn("bad login for {} ({})", email, exception.getClass().getSimpleName());
             throw exception;
         }
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("No user with email " + email));
 
         String token = jwtService.generateToken(user);
-        log.info("Successful login: userId={}, email={}, role={}", user.getId(), user.getEmail(), user.getRole());
+        log.info("{} signed in as {} (#{})", user.getEmail(), user.getRole(), user.getId());
 
         return AuthResponse.builder()
                 .token(token)
@@ -125,7 +123,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser(String email) {
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("No user with email " + email));
 
         return CurrentUserResponse.builder()
                 .userId(user.getId())

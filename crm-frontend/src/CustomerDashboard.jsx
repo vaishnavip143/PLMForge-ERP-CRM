@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import api, { errorMessage } from './api'
+import api, { friendlyError } from './api'
 import { Message } from './components'
 import { formatDateTime } from './helpers'
 
@@ -47,7 +47,7 @@ export default function CustomerDashboard({ user }) {
       setMessage({ type: 'success', text: response.data.message })
       setForm({ ...form, subject: '', description: '', phone: '' })
     } catch (error) {
-      setMessage({ type: 'error', text: errorMessage(error) })
+      setMessage({ type: 'error', text: friendlyError(error) })
     } finally {
       setSubmitting(false)
     }

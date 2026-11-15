@@ -4,9 +4,6 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-/**
- * Standard envelope used by every CRM API response.
- */
 @Getter
 @Setter
 @NoArgsConstructor

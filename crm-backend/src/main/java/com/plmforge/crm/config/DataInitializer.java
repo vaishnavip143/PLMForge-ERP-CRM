@@ -20,10 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * Creates development-only seed data when the database has no users.
- * Existing PostgreSQL data is never modified or duplicated.
- */
+// Demo data for local runs. Only fires when the users table is empty, so a database
+// that already has real rows is left well alone.
 @Component
 public class DataInitializer implements CommandLineRunner {
 
@@ -59,11 +57,11 @@ public class DataInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         if (userRepository.count() > 0) {
-            log.info("Database already contains users. Seed data was not inserted.");
+            log.info("users table already has rows, skipping the seed");
             return;
         }
 
-        log.info("Empty database detected. Seeding development data...");
+        log.info("empty users table, dropping in the demo data...");
 
         String encodedPassword = passwordEncoder.encode(DEV_PASSWORD);
 
@@ -109,6 +107,14 @@ public class DataInitializer implements CommandLineRunner {
                 .companyName("TechCorp Solutions")
                 .build());
 
+        // Spare account for demos that need a fourth existing customer. Left commented
+        // out because the seeded tickets below only use the three above.
+        // Customer betaRetail = customerRepository.save(Customer.builder()
+        //         .name("Beta Retail")
+        //         .email("beta@retail.test")
+        //         .companyName("Beta Retail Ltd.")
+        //         .build());
+
         PotentialCustomer lead = potentialCustomerRepository.save(PotentialCustomer.builder()
                 .name("Michael Green")
                 .email("prospect@startup.co")
@@ -117,9 +123,9 @@ public class DataInitializer implements CommandLineRunner {
                 .status(LeadStatus.NEW_LEAD)
                 .build());
 
-        LocalDateTime now = LocalDateTime.now();
+        var now = LocalDateTime.now();
 
-        Ticket existingCustomerTicket = ticketRepository.save(Ticket.builder()
+        Ticket invoiceTicket = ticketRepository.save(Ticket.builder()
                 .ticketNumber("TICK-" + now.toLocalDate().toString().replace("-", "") + "-100001")
                 .senderEmail(acme.getEmail())
                 .senderName(acme.getName())
@@ -135,7 +141,7 @@ public class DataInitializer implements CommandLineRunner {
                 .assignedTo(representative)
                 .build());
 
-        Ticket nearSlaTicket = ticketRepository.save(Ticket.builder()
+        Ticket scannerTicket = ticketRepository.save(Ticket.builder()
                 .ticketNumber("TICK-" + now.toLocalDate().toString().replace("-", "") + "-100002")
                 .senderEmail(techCorp.getEmail())
                 .senderName(techCorp.getName())
@@ -170,7 +176,7 @@ public class DataInitializer implements CommandLineRunner {
                 .assignedTo(representative)
                 .build());
 
-        Ticket leadTicket = ticketRepository.save(Ticket.builder()
+        Ticket prospectTicket = ticketRepository.save(Ticket.builder()
                 .ticketNumber("TICK-" + now.toLocalDate().toString().replace("-", "") + "-100004")
                 .senderEmail(lead.getEmail())
                 .senderName(lead.getName())
@@ -185,23 +191,23 @@ public class DataInitializer implements CommandLineRunner {
                 .createdAt(now.minusHours(2))
                 .build());
 
-        auditService.record(existingCustomerTicket.getId(), existingCustomerTicket.getTicketNumber(),
+        auditService.record(invoiceTicket.getId(), invoiceTicket.getTicketNumber(),
                 "QUERY_INGESTED_EXISTING_CUSTOMER", acme.getEmail(),
                 "Seed ticket for an existing customer with 24h TAT.");
 
-        auditService.record(leadTicket.getId(), leadTicket.getTicketNumber(),
+        auditService.record(prospectTicket.getId(), prospectTicket.getTicketNumber(),
                 "QUERY_INGESTED_POTENTIAL_CUSTOMER", lead.getEmail(),
                 "Seed lead ticket. Sales Manager was notified.");
 
         notificationService.notifyManagers(NotificationType.NEW_LEAD,
-                "New lead from " + lead.getEmail() + " (ticket #" + leadTicket.getTicketNumber() + ").",
-                leadTicket);
+                "New lead from " + lead.getEmail() + " (ticket #" + prospectTicket.getTicketNumber() + ").",
+                prospectTicket);
 
         notificationService.notifyManagers(NotificationType.SLA_WARNING,
-                "Ticket #" + nearSlaTicket.getTicketNumber() + " has less than 2 hours remaining.",
-                nearSlaTicket);
+                "Ticket #" + scannerTicket.getTicketNumber() + " has less than 2 hours remaining.",
+                scannerTicket);
 
-        log.info("Development seed complete: 3 users, 3 customers, 1 lead, 4 tickets, 2 notifications.");
-        log.info("Seed accounts: customer@erp.com, salesrep@erp.com, manager@erp.com");
+        log.info("seed done: 3 users, 3 customers, 1 lead, 4 tickets, 2 notifications");
+        log.info("logins: customer@erp.com / salesrep@erp.com / manager@erp.com (see DEV_PASSWORD)");
     }
 }

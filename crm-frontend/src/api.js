@@ -1,14 +1,13 @@
 import axios from 'axios'
 
-// The Spring Boot backend runs on port 8080.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080"
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// The JWT is stored in memory here and sent with every request.
+// Module-level on purpose: the token stays in memory, the session copy lives in App.jsx.
 let token = null
 
 export function setToken(value) {
@@ -16,20 +15,19 @@ export function setToken(value) {
 }
 
 api.interceptors.request.use((config) => {
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// Turns any Axios error into one sentence that can be shown on screen.
-export function errorMessage(error) {
+// Turns whatever Axios threw into one sentence we can put in a Message.
+export function friendlyError(error) {
   if (!error.response) {
     return `Cannot reach the backend at ${API_BASE_URL}. Is Spring Boot running?`
   }
 
   const { data, status } = error.response
 
+  // Bean validation hands back a field -> message map; flatten it to one line.
   if (data && data.validationErrors) {
     return Object.values(data.validationErrors).join(' ')
   }

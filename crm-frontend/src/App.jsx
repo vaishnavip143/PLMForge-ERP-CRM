@@ -7,11 +7,10 @@ import SalesDashboard from './SalesDashboard'
 import LoginScreen from './LoginScreen'
 import { normalizeRole } from './helpers'
 
-const SESSION_KEY = 'plmforge-crm-session'
+const SESSION_KEY = "plmforge-crm-session";
 
-// Role hints shown on the login screen. Customers create their own account through
-// registration, so no customer email is assumed here. Sales accounts are seeded by
-// the backend. No passwords are stored in the frontend.
+// Portal hints for the login screen. Sales accounts come from the backend seed data;
+// customers register their own, so there is no default customer email here.
 const ROLE_OPTIONS = [
   {
     role: 'CUSTOMER',
@@ -57,7 +56,7 @@ export default function App() {
     }
   }, [session])
 
-  // Check a saved token once on page load, so an expired token logs out cleanly.
+  // Validate a saved token on load. Expired or tampered -> straight back to login.
   useEffect(() => {
     if (!checking) return undefined
 
@@ -71,7 +70,7 @@ export default function App() {
 
         setSession((current) => {
           if (!current) return current
-          // The saved session must still belong to the portal that created it.
+          // A saved session is only valid for the portal that created it.
           if (actualRole !== current.portalRole) return null
           return {
             ...current,
@@ -126,7 +125,6 @@ export default function App() {
   }
 
   async function registerCustomer(form) {
-    // Registration is a separate action from login: only create the account here.
     const response = await api.post('/api/auth/register', form)
     return response.data.data
   }
@@ -136,8 +134,8 @@ export default function App() {
     setPreferredRole('')
   }
 
-  // Changing role signs the user out; the login screen then needs that role's
-  // own credentials. The selected role alone never changes the session.
+  // TODO: keep the last portal in localStorage so signing out does not reset the picker.
+  // Changing role signs out - the next login needs that role's own credentials.
   function changeRole(nextRole) {
     setSession(null)
     setPreferredRole(nextRole)

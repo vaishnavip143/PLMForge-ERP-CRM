@@ -16,13 +16,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * SLA monitoring.
- *
- * Rule: an active ticket (OPEN / IN_PROGRESS) with more than 0 and less than
- * 2 hours remaining is an SLA warning. Tickets past their due date are overdue.
- * Resolved and closed tickets are never flagged.
- */
+// SLA monitoring. An OPEN/IN_PROGRESS ticket with less than 2 hours left is a
+// warning, one past its due date is a breach. RESOLVED/CLOSED never get flagged.
 @Service
 public class SlaService {
 
@@ -52,18 +47,16 @@ public class SlaService {
         try {
             SlaScanResult result = scanTickets();
             if (result.warningsRaised() + result.breachesRaised() > 0) {
-                log.info("SLA scan completed: {} warning(s), {} breach(es)",
+                log.info("SLA scan: {} warning(s), {} breach(es) raised",
                         result.warningsRaised(), result.breachesRaised());
             }
         } catch (Exception exception) {
-            log.error("SLA scan failed", exception);
+            log.error("SLA scan fell over, trying again on the next tick", exception);
         }
     }
 
-    /**
-     * Scans active tickets, flags SLA warnings / breaches and notifies managers.
-     * Also callable from tests and from the manager scan endpoint.
-     */
+    // Runs on the scheduler. Flags are only set once per ticket, so a rescan does
+    // not send the managers the same notification over and over.
     @Transactional
     public SlaScanResult scanTickets() {
         List<Ticket> activeTickets = ticketRepository.findByStatusInOrderByDueAtAsc(ACTIVE_STATUSES);
@@ -71,8 +64,9 @@ public class SlaService {
         int warningsRaised = 0;
         int breachesRaised = 0;
 
+        // FIXME: this re-reads every active ticket on each tick. Fine for a demo-sized
+        // queue, would need paging before it goes near real volume.
         for (Ticket ticket : activeTickets) {
-            // Defensive guard: resolved and closed tickets are never SLA-flagged.
             if (ticket.getStatus() == null || ticket.getStatus().isFinalStatus()
                     || ticket.getDueAt() == null) {
                 continue;
@@ -87,8 +81,8 @@ public class SlaService {
                     ticketRepository.save(ticket);
                     breachesRaised++;
 
-                    log.warn("SLA BREACH: ticket={}, customer={}, overdueByMinutes={}",
-                            ticket.getTicketNumber(), ticket.getSenderEmail(), Math.abs(remainingMinutes));
+                    log.warn("ticket {} is past due by {} min ({})",
+                            ticket.getTicketNumber(), Math.abs(remainingMinutes), ticket.getSenderEmail());
 
                     notificationService.notifyManagers(NotificationType.SLA_BREACH,
                             "Ticket #" + ticket.getTicketNumber() + " breached its 24-hour SLA ("
@@ -106,8 +100,8 @@ public class SlaService {
                     ticketRepository.save(ticket);
                     warningsRaised++;
 
-                    log.warn("SLA WARNING: ticket={}, customer={}, remainingMinutes={}",
-                            ticket.getTicketNumber(), ticket.getSenderEmail(), remainingMinutes);
+                    log.warn("ticket {} has only {} min left ({})",
+                            ticket.getTicketNumber(), remainingMinutes, ticket.getSenderEmail());
 
                     notificationService.notifyManagers(NotificationType.SLA_WARNING,
                             "Ticket #" + ticket.getTicketNumber() + " has less than 2 hours remaining ("
@@ -127,9 +121,9 @@ public class SlaService {
     @Transactional(readOnly = true)
     public SlaAlertsResponse getSlaAlerts() {
         LocalDateTime now = LocalDateTime.now();
-        List<Ticket> activeTickets = ticketRepository.findByStatusInOrderByDueAtAsc(ACTIVE_STATUSES);
+        var active = ticketRepository.findByStatusInOrderByDueAtAsc(ACTIVE_STATUSES);
 
-        List<TicketResponse> warnings = activeTickets.stream()
+        List<TicketResponse> warnings = active.stream()
                 .filter(ticket -> ticket.getDueAt() != null)
                 .filter(ticket -> {
                     long minutes = Duration.between(now, ticket.getDueAt()).toMinutes();
@@ -138,7 +132,7 @@ public class SlaService {
                 .map(ticketService::mapToResponse)
                 .toList();
 
-        List<TicketResponse> overdue = activeTickets.stream()
+        List<TicketResponse> overdue = active.stream()
                 .filter(ticket -> ticket.getDueAt() != null)
                 .filter(ticket -> Duration.between(now, ticket.getDueAt()).toMinutes() <= 0)
                 .map(ticketService::mapToResponse)

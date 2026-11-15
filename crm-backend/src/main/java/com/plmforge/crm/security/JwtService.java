@@ -14,9 +14,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
-/**
- * Creates and validates JWT access tokens.
- */
 @Service
 public class JwtService {
 

@@ -10,10 +10,8 @@ export function Message({ type = 'info', children }) {
   )
 }
 
-/**
- * Dashboard layout: sidebar with the signed-in user, the role simulator
- * buttons and the page content on the right.
- */
+// Shell shared by all three dashboards: sidebar on the left, page on the right.
+// The role buttons only sign the user out - they cannot switch a live session.
 export function Layout({ user, role, title, subtitle, roleOptions, onChangeRole, onLogout, children }) {
   const roleLabel = roleOptions.find((option) => option.role === role)?.title || role
 
@@ -81,10 +79,10 @@ export function Layout({ user, role, title, subtitle, roleOptions, onChangeRole,
 
 function StatusBadge({ status }) {
   const labels = {
-    OPEN: 'Open',
-    IN_PROGRESS: 'In progress',
-    RESOLVED: 'Resolved',
-    CLOSED: 'Closed',
+    OPEN: "Open",
+    IN_PROGRESS: "In progress",
+    RESOLVED: "Resolved",
+    CLOSED: "Closed",
   }
   const className = String(status || '').toLowerCase().replace(/_/g, '-')
 
