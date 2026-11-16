@@ -76,16 +76,59 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketIngestResponse ingest(TicketIngestRequest request, String performedBy) {
-        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
-        String name = request.getName().trim();
-        String phone = trimToNull(request.getPhone());
+    public TicketIngestResponse ingest(TicketIngestRequest request, String performedBy, Boolean isAuthenticated) {
+        return ingest(request, performedBy, isAuthenticated, null);
+    }
+
+    @Transactional
+    public TicketIngestResponse ingest(TicketIngestRequest request, String performedBy, Boolean isAuthenticated,
+                                       UserPrincipal principal) {
         var now = LocalDateTime.now();
 
-        log.info("query came in from {} (customerId={}, subject=\"{}\")",
-                email, request.getCustomerId(), request.getSubject());
+        String email;
+        String name;
+        String phone;
+        Customer knownCustomer;
 
-        Customer knownCustomer = resolveExistingCustomer(request.getCustomerId(), email);
+        boolean isAuthenticatedCustomer = isAuthenticated != null && isAuthenticated
+                && principal != null
+                && principal.getRole() == Role.ROLE_CUSTOMER;
+
+        if (isAuthenticatedCustomer) {
+            // For a logged-in customer, always use identity from JWT/security context.
+            email = principal.getUsername().trim().toLowerCase(Locale.ROOT);
+            name = principal.getName() != null ? principal.getName().trim() : request.getName().trim();
+            Customer profile = customerRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (profile != null) {
+                knownCustomer = profile;
+                if (name == null || name.isBlank()) {
+                    name = profile.getName();
+                }
+                phone = trimToNull(request.getPhone());
+                if (phone == null) {
+                    phone = trimToNull(profile.getPhone());
+                }
+            } else {
+                // Fallback: treat as authenticated user identity even if customer profile row is missing.
+                knownCustomer = null;
+                phone = trimToNull(request.getPhone());
+            }
+        } else if (isAuthenticated == null || !isAuthenticated) {
+            // Public submission: no authenticated customer, resolve by email only.
+            email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+            name = request.getName().trim();
+            phone = trimToNull(request.getPhone());
+            knownCustomer = resolveExistingCustomerByEmail(email);
+        } else {
+            // Other authenticated roles (sales/manager) submitting on behalf of someone.
+            email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+            name = request.getName().trim();
+            phone = trimToNull(request.getPhone());
+            knownCustomer = resolveExistingCustomer(request.getCustomerId(), email);
+        }
+
+        log.info("query came in from {} (customerId={}, subject=\"{}\", authenticatedCustomer={})",
+                email, request.getCustomerId(), request.getSubject(), isAuthenticatedCustomer);
 
         if (knownCustomer != null) {
             log.info("{} is an existing customer (#{})", email, knownCustomer.getId());
@@ -170,6 +213,14 @@ public class TicketService {
             }
             log.warn("customerId={} does not exist, falling back to the email lookup", customerId);
         }
+        return customerRepository.findByEmailIgnoreCase(email).orElse(null);
+    }
+
+    /**
+     * Resolve an existing customer by email only (for public submissions without JWT).
+     * Returns the customer if the email matches, or null if no customer found.
+     */
+    private Customer resolveExistingCustomerByEmail(String email) {
         return customerRepository.findByEmailIgnoreCase(email).orElse(null);
     }
 
@@ -298,6 +349,11 @@ public class TicketService {
 
         TicketStatus oldStatus = ticket.getStatus();
         TicketStatus newStatus = request.getStatus();
+
+        if (newStatus == TicketStatus.RESOLVED
+                && (request.getResolutionNotes() == null || request.getResolutionNotes().isBlank())) {
+            throw new BadRequestException("A resolution message is required when resolving a ticket.");
+        }
 
         ticket.setStatus(newStatus);
         if (request.getResolutionNotes() != null && !request.getResolutionNotes().isBlank()) {

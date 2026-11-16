@@ -79,7 +79,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/tickets/my").hasRole("CUSTOMER")
 
                         .requestMatchers(HttpMethod.POST, "/api/tickets/ingest")
-                        .hasAnyRole("CUSTOMER", "SALES_REPRESENTATIVE", "SALES_MANAGER")
+                        .permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/api/public/ingest")
+                        .permitAll()
 
                         // Route rules only cover the role. Per-object ownership is checked in the services.
                         .anyRequest().authenticated())

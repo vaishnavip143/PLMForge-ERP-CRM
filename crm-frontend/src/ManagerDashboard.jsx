@@ -20,6 +20,12 @@ export default function ManagerDashboard() {
   const [slaLoading, setSlaLoading] = useState(true)
   const [slaError, setSlaError] = useState('')
 
+  const [representatives, setRepresentatives] = useState([])
+  const [repsLoading, setRepsLoading] = useState(true)
+  const [repsError, setRepsError] = useState('')
+  const [assignSelections, setAssignSelections] = useState({})
+  const [assigningId, setAssigningId] = useState(null)
+
   const [markingId, setMarkingId] = useState(null)
   const [message, setMessage] = useState(null)
 
@@ -71,12 +77,25 @@ export default function ManagerDashboard() {
     }
   }
 
-  // Four separate calls so one slow panel does not hold up the rest.
+  async function loadRepresentatives() {
+    try {
+      const response = await api.get('/api/manager/representatives')
+      setRepresentatives(response.data.data || [])
+      setRepsError('')
+    } catch (error) {
+      setRepsError(friendlyError(error))
+    } finally {
+      setRepsLoading(false)
+    }
+  }
+
+  // Separate calls so one slow panel does not hold up the rest.
   useEffect(() => {
     loadTickets()
     loadLeads()
     loadNotifications()
     loadSlaAlerts()
+    loadRepresentatives()
   }, [])
 
   async function markAsRead(notification) {
@@ -96,6 +115,34 @@ export default function ManagerDashboard() {
     }
   }
 
+  function updateAssignmentSelection(ticketId, representativeId) {
+    setAssignSelections({ ...assignSelections, [ticketId]: representativeId })
+  }
+
+  async function assignTicket(ticket) {
+    const representativeId = assignSelections[ticket.id] || ticket.assignedToId
+    if (!representativeId) {
+      setMessage({ type: 'error', text: 'Please select a sales representative before assigning.' })
+      return
+    }
+
+    setAssigningId(ticket.id)
+    setMessage(null)
+    try {
+      const response = await api.post(`/api/manager/tickets/${ticket.id}/assign`, {
+        representativeId: Number(representativeId),
+      })
+      const updatedTicket = response.data.data
+      setTickets(tickets.map((item) => (item.id === updatedTicket.id ? updatedTicket : item)))
+      setMessage({ type: 'success', text: `Ticket ${updatedTicket.ticketNumber} assigned successfully.` })
+      loadSlaAlerts()
+    } catch (error) {
+      setMessage({ type: 'error', text: friendlyError(error) })
+    } finally {
+      setAssigningId(null)
+    }
+  }
+
   const unreadCount = notifications.filter((notification) => !notification.read).length
 
   return (
@@ -111,10 +158,40 @@ export default function ManagerDashboard() {
 
         {ticketsError && <Message type="error">{ticketsError}</Message>}
 
+        {repsError && <Message type="error">{repsError}</Message>}
+
         {ticketsLoading ? (
           <p className="empty">Loading tickets…</p>
         ) : (
-          <TicketTable tickets={tickets} emptyText="No tickets found." showAssigned />
+          <TicketTable
+            tickets={tickets}
+            emptyText="No tickets found."
+            showAssigned
+            renderActions={(ticket) => (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={assignSelections[ticket.id] || ticket.assignedToId || ''}
+                  onChange={(event) => updateAssignmentSelection(ticket.id, event.target.value)}
+                  disabled={repsLoading || assigningId === ticket.id}
+                >
+                  <option value="">Select representative</option>
+                  {representatives.map((rep) => (
+                    <option key={rep.id} value={rep.id}>
+                      {rep.name} ({rep.email})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  disabled={repsLoading || assigningId === ticket.id}
+                  onClick={() => assignTicket(ticket)}
+                >
+                  {assigningId === ticket.id ? 'Assigning…' : 'Assign'}
+                </button>
+              </div>
+            )}
+          />
         )}
       </section>
 

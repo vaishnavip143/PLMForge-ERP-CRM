@@ -43,6 +43,15 @@ export default function SalesDashboard() {
     setSaving(true)
     setMessage(null)
 
+    if (form.status === 'RESOLVED' && !form.resolutionNotes.trim()) {
+      setMessage({
+        type: 'error',
+        text: 'Please enter a resolution message before resolving the ticket.',
+      })
+      setSaving(false)
+      return
+    }
+
     try {
       const response = await api.put(`/api/sales/tickets/${selected.id}/status`, {
         status: form.status,
@@ -135,21 +144,24 @@ export default function SalesDashboard() {
               </div>
 
               <div className="field full">
-                <label htmlFor="resolution-notes">
-                  Resolution notes <span className="optional">(optional)</span>
+                <label htmlFor="resolution-message">
+                  Resolution message<span className="required">*</span>
                 </label>
                 <textarea
-                  id="resolution-notes"
+                  id="resolution-message"
                   rows="3"
                   value={form.resolutionNotes}
                   onChange={(event) => setForm({ ...form, resolutionNotes: event.target.value })}
                   placeholder="What was done to resolve the query?"
                 />
+                <span className="hint-text" style={{ marginTop: '0.25rem', display: 'block', fontSize: '0.85rem', color: '#64748b' }}>
+                  Required when status is Resolved.
+                </span>
               </div>
 
               <div className="form-actions">
                 <button className="btn btn-primary" type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save status'}
+                  {saving ? 'Saving…' : form.status === 'RESOLVED' ? 'Resolve ticket' : 'Save status'}
                 </button>
                 <span className="hint-text">
                   Sent to <code>PUT /api/sales/tickets/{selected.id}/status</code>.

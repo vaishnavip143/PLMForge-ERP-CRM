@@ -32,7 +32,13 @@ public class TicketController {
     @Operation(summary = "Ingest a customer query (existing customer or new lead)")
     public ResponseEntity<ApiResponse<TicketIngestResponse>> ingest(@Valid @RequestBody TicketIngestRequest request,
                                                                     Authentication authentication) {
-        TicketIngestResponse response = ticketService.ingest(request, authentication.getName());
+        boolean isAuthenticated = authentication != null && authentication.isAuthenticated();
+        String performedBy = authentication != null ? authentication.getName() : null;
+        UserPrincipal principal = null;
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal userPrincipal) {
+            principal = userPrincipal;
+        }
+        TicketIngestResponse response = ticketService.ingest(request, performedBy, isAuthenticated, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(response, response.getMessage()));
     }

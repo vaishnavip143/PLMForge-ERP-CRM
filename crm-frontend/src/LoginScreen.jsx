@@ -124,6 +124,23 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
           backend seed data. No passwords are shown in this UI.
         </p>
 
+        <div style={{ textAlign: 'center', margin: '1rem 0' }}>
+          <p style={{ margin: '0.5rem 0' }}>
+            <strong>Submit a query without login:</strong> Anyone can submit a query using their name and email.
+          </p>
+          <a
+            href="#"
+            onClick={() => setNotice('Use the public API endpoint to submit a query without login.')}
+            style={{ color: '#0066cc', textDecoration: 'none', fontWeight: '500' }}
+          >Submit without login →</a>
+        </div>
+
+        <p className="auth-note" style={{ color: '#666' }}>
+          Picking a role only helps you identify the account to use; it never grants access. Customer
+          accounts come from registration, while representative and manager accounts come from the
+          backend seed data. No passwords are shown in this UI.
+        </p>
+
         <section className="auth-form-card">
           <div className="auth-tabs">
             <button
@@ -248,6 +265,12 @@ export default function LoginScreen({ roleOptions, preferredRole, onLogin, onReg
             </form>
           )}
         </section>
+        <p className="auth-note" style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <a
+            href="#"
+            onClick={() => setNotice('Use the public API endpoint to submit a query without login.')}
+          >Submit without login</a>
+        </p>
       </div>
     </div>
   )

@@ -36,6 +36,10 @@ export function friendlyError(error) {
     return data.message
   }
 
+  if (data && data.success === false) {
+    return data.message || `Request failed with status ${status}.`
+  }
+
   return `Request failed with status ${status}.`
 }
 
