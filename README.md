@@ -187,7 +187,7 @@ crm-backend/                         # repository root
 │       │   └── service/             # Business logic
 │       └── resources/
 │           ├── application.properties            # local config (git-ignored)
-│           └── application.properties.example    # safe configuration template
+│           
 └── crm-frontend/                    # React application
     ├── package.json
     ├── package-lock.json
